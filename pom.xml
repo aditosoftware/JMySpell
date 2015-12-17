@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>de.adito</groupId>
+        <artifactId>adito-parent</artifactId>
+        <version>1.1.0</version>
+    </parent>
+
+    <groupId>org.dts</groupId>
+    <artifactId>JMySpell</artifactId>
+    <version>2011-01-21_adito</version>
+
+    <build>
+        <plugins>
+
+            <plugin>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
+    </build>
+
+    <scm>
+        <developerConnection>scm:git:git@github.com:aditosoftware/JMySpell.git</developerConnection>
+    </scm>
+
+</project>
