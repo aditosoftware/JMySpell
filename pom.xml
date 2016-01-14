@@ -12,7 +12,7 @@
 
     <groupId>org.dts</groupId>
     <artifactId>JMySpell</artifactId>
-    <version>2011-01-21_adito_4</version>
+    <version>2011-01-21_adito_5b</version>
 
     <build>
         <plugins>
@@ -34,5 +34,13 @@
     <scm>
         <developerConnection>scm:git:git@github.com:aditosoftware/JMySpell.git</developerConnection>
     </scm>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>18.0</version>
+        </dependency>
+    </dependencies>
 
 </project>

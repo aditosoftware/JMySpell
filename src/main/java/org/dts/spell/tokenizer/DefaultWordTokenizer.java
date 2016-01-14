@@ -6,6 +6,7 @@ package org.dts.spell.tokenizer;
 
 import java.text.BreakIterator ;
 
+import com.google.common.base.CharMatcher;
 import org.dts.spell.finder.Word ;
 
 /**
@@ -51,15 +52,29 @@ public class DefaultWordTokenizer extends AbstractWordTokenizer
 
     if (end == BreakIterator.DONE)
       end = sequence.length() - 1 ;
-    
-    String text = sequence.subSequence(start, end).toString().trim() ;
+
+    String text = trim(sequence.subSequence(start, end));
     
     if (!text.equals(""))
       return new Word(text, start, isStartOfSentence(sequence, start)) ;
     else
       return null ;
   }
-  
+  /**
+   * Properly trim a string of all whitespace, including linebreaks and
+   * unicode whitespace
+   *
+   * @param sequence
+   *            char sequence
+   * @return trimmed string
+   */
+  protected final String trim(CharSequence sequence)
+  {
+    if (sequence == null)
+      return null;
+    else
+      return CharMatcher.WHITESPACE.trimFrom(sequence);
+  }
   
   /*
    * (non-Javadoc)
