@@ -37,7 +37,7 @@ public class DefaultWordTokenizer extends AbstractWordTokenizer
     if (start == BreakIterator.DONE)
       start = 0 ;
 
-    String text = sequence.subSequence(start, end).toString().trim() ;
+    String text = trim(sequence.subSequence(start, end));
     
     if (!text.equals(""))
       return new Word(text, start, isStartOfSentence(sequence, start)) ;

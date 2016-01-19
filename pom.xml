@@ -12,7 +12,7 @@
 
     <groupId>org.dts</groupId>
     <artifactId>JMySpell</artifactId>
-    <version>2011-01-21_adito_5b</version>
+    <version>2011-01-21_adito_5c</version>
 
     <build>
         <plugins>
