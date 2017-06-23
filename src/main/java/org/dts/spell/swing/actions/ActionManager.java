@@ -41,7 +41,7 @@ public abstract class ActionManager {
    */
   public AddWordAction getAddWordAction(JTextComponentSpellChecker cmpTxtSpellChecker) {
     if (null == addWordAction)
-      addWordAction = createAddWordAction(null) ;
+      addWordAction = createAddWordAction(cmpTxtSpellChecker) ;
 
     return addWordAction;
   }
