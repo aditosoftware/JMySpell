@@ -4,19 +4,19 @@
  */
 package org.dts.spell.swing;
 
+import org.dts.spell.dictionary.*;
 import org.dts.spell.swing.event.TextComponentSpellCheckerListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.swing.*;
 import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 
 import org.dts.spell.ErrorInfo;
 import org.dts.spell.SpellChecker;
-import org.dts.spell.dictionary.SpellDictionary;
-import org.dts.spell.dictionary.SpellDictionaryException;
 import org.dts.spell.finder.Word;
 import org.dts.spell.swing.actions.ActionManager;
 import org.dts.spell.swing.actions.AddWordAction;
@@ -48,22 +48,11 @@ public class JTextComponentSpellChecker
   private ErrorToolTips errorToolTips = new ErrorToolTips() ;
   private ErrorPopUpMenu errorPopUpMenu = new ErrorPopUpMenu(this) ;
   private ActionManager actionManager = new DefaultActionManager() ;
+  private Map<JTextComponent, ISpellDictionaryListener> dictionaryListenerMap = new HashMap<>();
 
   private EventMulticaster<TextComponentSpellCheckerListener> eventMulticaster = new EventMulticaster<TextComponentSpellCheckerListener>(TextComponentSpellCheckerListener.class) ;
-  
-  private static final String DESTROY_PROPERTY = "ancestor" ;
-  private static final String DOCUMENT_PROPERTY = "document" ;
-  
-  private PropertyChangeListener automaticStopListener = new PropertyChangeListener()
-  {
-     public void propertyChange(PropertyChangeEvent evt) {
-      JTextComponent cmp = (JTextComponent) evt.getSource() ;
 
-      // TODO : May be more correct evt.getNewValue() == null
-      if (!cmp.isDisplayable())
-        stopRealtimeMarkErrors(cmp) ;
-    }
-  } ;
+  private static final String DOCUMENT_PROPERTY = "document" ;
 
   private PropertyChangeListener docChangeListener = new PropertyChangeListener()
   {
@@ -71,8 +60,8 @@ public class JTextComponentSpellChecker
       JTextComponent cmp = (JTextComponent) evt.getSource() ;
       Document oldDoc = (Document) evt.getOldValue() ;
       
-      if (isRealtimeMarkErrors(oldDoc, cmp))
-        startRealtimeMarkErrors(cmp, stopRealtimeMarkErrors(oldDoc, cmp, false)) ;
+      if (isRealtimeMarkErrors(oldDoc, cmp) && !isRealtimeMarkErrors(cmp.getDocument(), cmp))
+        startRealtimeMarkErrors(cmp, stopRealtimeMarkErrors(oldDoc, cmp)) ;
     }
   } ;
   
@@ -228,52 +217,60 @@ public class JTextComponentSpellChecker
    * @param textComponent
    * @param wordFinder
    */
-  public void startRealtimeMarkErrors(JTextComponent textComponent, DocumentWordFinder wordFinder)
+  public void startRealtimeMarkErrors(final JTextComponent textComponent, DocumentWordFinder wordFinder)
   {
-    Document doc = textComponent.getDocument() ;
-    
-    wordFinder.setDocument(doc) ;
-    
-    if (null == realTimeSpellChecker)
-    {
-      realTimeSpellChecker = new RealTimeSpellChecker(spellChecker) ;
-      realTimeSpellChecker.start() ;
-    }
-    
-    realTimeSpellChecker.addTextComponent(textComponent, wordFinder) ;
-    markInManagers(realTimeSpellChecker.getErrorMarker(textComponent)) ;
-    
-    textComponent.addPropertyChangeListener(DESTROY_PROPERTY, automaticStopListener);
-    textComponent.addPropertyChangeListener(DOCUMENT_PROPERTY, docChangeListener) ;
-    
-    eventMulticaster.getMulticaster().realTimeStart(new TextComponentSpellCheckerEvent(this, textComponent)) ;
+    Document doc = textComponent.getDocument();
+
+    wordFinder.setDocument(doc);
+
+    if (realTimeSpellChecker == null)
+      realTimeSpellChecker = new RealTimeSpellChecker(spellChecker);
+
+    if(!realTimeSpellChecker.isRunning())
+      realTimeSpellChecker.start();
+
+    realTimeSpellChecker.addTextComponent(textComponent, wordFinder);
+    markInManagers(realTimeSpellChecker.getErrorMarker(textComponent));
+
+    ISpellDictionaryListener listener = new DictionaryListener(textComponent);
+    spellChecker.getDictionary().addDictionaryListener(listener);
+    dictionaryListenerMap.put(textComponent, listener);
+
+    textComponent.addPropertyChangeListener(DOCUMENT_PROPERTY, docChangeListener);
+
+    eventMulticaster.getMulticaster().realTimeStart(new TextComponentSpellCheckerEvent(this, textComponent));
   }
   
   public void stopRealtimeMarkErrors(JTextComponent textComponent)
   {
-    stopRealtimeMarkErrors(textComponent.getDocument(), textComponent, true) ;
+    stopRealtimeMarkErrors(textComponent.getDocument(), textComponent) ;
   }
   
-  DocumentWordFinder stopRealtimeMarkErrors(Document doc, JTextComponent textComponent, boolean stopIfNoEditor)
+  DocumentWordFinder stopRealtimeMarkErrors(Document doc, JTextComponent textComponent)
   {
     DocumentWordFinder result = null ;
     
     if (isRealtimeMarkErrors(doc, textComponent))
     {
-      TextComponentSpellCheckerEvent evt = new TextComponentSpellCheckerEvent(this, textComponent) ;
-      eventMulticaster.getMulticaster().realTimeWillStop(evt) ;
-      
-      unMarkInManagers(realTimeSpellChecker.getErrorMarker(doc, textComponent)) ;
-      result = realTimeSpellChecker.removeTextComponent(doc, textComponent) ;
-      textComponent.removePropertyChangeListener(DESTROY_PROPERTY, automaticStopListener);      
-      textComponent.removePropertyChangeListener(DOCUMENT_PROPERTY, docChangeListener) ;
-      
-      eventMulticaster.getMulticaster().realTimeStop(evt) ;
-      
-      if (stopIfNoEditor && realTimeSpellChecker.isEmpty())
+      TextComponentSpellCheckerEvent evt = new TextComponentSpellCheckerEvent(this, textComponent);
+      eventMulticaster.getMulticaster().realTimeWillStop(evt);
+
+      unMarkInManagers(realTimeSpellChecker.getErrorMarker(doc, textComponent));
+      result = realTimeSpellChecker.removeTextComponent(doc, textComponent);
+      textComponent.removePropertyChangeListener(DOCUMENT_PROPERTY, docChangeListener);
+
+      eventMulticaster.getMulticaster().realTimeStop(evt);
+
+      if(dictionaryListenerMap.containsKey(textComponent))
+      {
+        ISpellDictionaryListener listener = dictionaryListenerMap.get(textComponent);
+        spellChecker.getDictionary().removeDictionaryListener(listener);
+      }
+
+      if(realTimeSpellChecker.isEmpty() && realTimeSpellChecker.isRunning())
       {
         realTimeSpellChecker.stop();
-        realTimeSpellChecker = null ;
+        realTimeSpellChecker = null;
       }
     }
     
@@ -342,8 +339,6 @@ public class JTextComponentSpellChecker
 
   /**
    * Change the popupmenu to show when mouse is over an error. It try to preserve original ones.
-   * 
-   * @param errorToolTips It can be null, in that case no popupmenu is show.
    */
   public void setErrorPopUpMenu(ErrorPopUpMenu errorPopUpMenu)
   {
@@ -480,5 +475,29 @@ public class JTextComponentSpellChecker
 
   public ReplaceWordAction getReplaceWordAction(String sugestion) {
     return actionManager.getReplaceWordAction(this, sugestion) ;
+  }
+
+  private class DictionaryListener implements ISpellDictionaryListener
+  {
+    private JTextComponent textComponent;
+
+    public DictionaryListener(JTextComponent pTextComponent)
+    {
+      textComponent = pTextComponent;
+    }
+
+    @Override
+    public void wordAdded(String pWord)
+    {
+      recheckErrors(textComponent);
+      SwingUtilities.invokeLater(new Runnable()
+      {
+        @Override
+        public void run()
+        {
+          textComponent.repaint();
+        }
+      });
+    }
   }
 }

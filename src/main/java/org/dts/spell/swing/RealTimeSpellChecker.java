@@ -6,6 +6,7 @@ import java.util.List;
 
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
@@ -186,7 +187,17 @@ public class RealTimeSpellChecker implements DocumentListener, Runnable
   }
   
   private Thread thread ;
-  
+
+  /**
+   * Gibt an, ob der SpellChecker gerade läuft
+   *
+   * @return true, wenn er läuft
+   */
+  public boolean isRunning()
+  {
+    return thread != null;
+  }
+
   public synchronized void start()
   {
     assert null == thread ;
@@ -313,16 +324,19 @@ public class RealTimeSpellChecker implements DocumentListener, Runnable
 
     for (TextComponentAndFinder txtCmpFnd : list)
     {
-      SynchronizedWordFinder finder = txtCmpFnd.getWordFinder() ;
-      
-      listener.setErrorMarker(txtCmpFnd.getErrorMarker()) ;
-      
-      // NOTE : this word can not be valid, but in the next cycle the correct errors will be marked
-      Word lastWord = finder.setTextRange(range) ;
+      if(txtCmpFnd != null)
+      {
+        SynchronizedWordFinder finder = txtCmpFnd.getWordFinder();
 
-      //System.out.println("LastWord = " + lastWord) ;
-      spellChecker.setLastWord(lastWord) ;
-      spellChecker.check(finder, listener) ;
+        listener.setErrorMarker(txtCmpFnd.getErrorMarker());
+
+        // NOTE : this word can not be valid, but in the next cycle the correct errors will be marked
+        Word lastWord = finder.setTextRange(range);
+
+        //System.out.println("LastWord = " + lastWord) ;
+        spellChecker.setLastWord(lastWord);
+        spellChecker.check(finder, listener);
+      }
     }
   }
   

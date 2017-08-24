@@ -98,4 +98,18 @@ public interface SpellDictionary
    * @param listener
    */
   public void removeProgressListener(ProgressListener listener) ;
+
+  /**
+   * Fügt einen DictionaryListener hinzu
+   *
+   * @param pListener Listener, der hinzugefügt werden soll
+   */
+  public void addDictionaryListener(ISpellDictionaryListener pListener);
+
+  /**
+   * Entfernt einen DictionaryListener
+   *
+   * @param pListener Listener, der entfernt werden soll
+   */
+  public void removeDictionaryListener(ISpellDictionaryListener pListener);
 }

@@ -4,135 +4,154 @@
  */
 package org.dts.spell.dictionary.openoffice;
 
-import java.util.Locale;
 import org.dts.spell.dictionary.*;
-import org.dts.spell.event.ProgressListenerSupport;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.net.URL;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.zip.ZipFile;
+import org.dts.spell.dictionary.myspell.*;
+import org.dts.spell.event.*;
+import org.dts.spell.utils.*;
 
-import org.dts.spell.dictionary.myspell.MySpell;
-import org.dts.spell.dictionary.myspell.Utils;
-import org.dts.spell.event.ProgressEvent;
-import org.dts.spell.event.ProgressListener;
-import org.dts.spell.utils.FileUtils;
+import java.io.*;
+import java.net.URL;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.zip.ZipFile;
 
 /**
  * @author DreamTangerine
- *
  */
-public class OpenOfficeSpellDictionary implements SpellDictionary {
+public class OpenOfficeSpellDictionary implements SpellDictionary
+{
 
   private File personalDict;
   private MySpell mySpell;
   private Future<Object> loader = null;
   private ProgressListenerSupport listeners = new ProgressListenerSupport();
+  private EventMulticaster<ISpellDictionaryListener> dictionaryListeners = new EventMulticaster<>(ISpellDictionaryListener.class);
   private Locale locale;
   private URL sourceURL;
 
   // Constructor that don't load the dictionary, to allow add listeners. Use load to begin the load of dictionary.
-  public OpenOfficeSpellDictionary() {
+  public OpenOfficeSpellDictionary()
+  {
   }
 
-  public OpenOfficeSpellDictionary(Locale locale) {
+  public OpenOfficeSpellDictionary(Locale locale)
+  {
     this.locale = locale;
   }
 
   //Emilio Gustavo Ormeño
-  public OpenOfficeSpellDictionary(InputStream affIS, InputStream dicIS) throws IOException {
+  public OpenOfficeSpellDictionary(InputStream affIS, InputStream dicIS) throws IOException
+  {
     this(affIS, dicIS, true);
   }
 
-  public OpenOfficeSpellDictionary(InputStream affIS, InputStream dicIS, boolean inBackground) throws IOException {
-    this(affIS, dicIS, getPersonalWordsFile(), true);
+  public OpenOfficeSpellDictionary(InputStream affIS, InputStream dicIS, boolean inBackground) throws IOException
+  {
+    this(affIS, dicIS, getPersonalWordsFile(), inBackground);
   }
 
-  public OpenOfficeSpellDictionary(InputStream affIS, InputStream dicIS, File personalDict, boolean inBackground) throws IOException {
+  public OpenOfficeSpellDictionary(InputStream affIS, InputStream dicIS, File personalDict, boolean inBackground) throws IOException
+  {
     load(affIS, dicIS, personalDict, inBackground);
   }
 
-  public OpenOfficeSpellDictionary(ZipFile zipFile) throws IOException {
+  public OpenOfficeSpellDictionary(ZipFile zipFile) throws IOException
+  {
     this(zipFile, true);
   }
 
-  public OpenOfficeSpellDictionary(final ZipFile zipFile, boolean inBackground) throws IOException {
+  public OpenOfficeSpellDictionary(final ZipFile zipFile, boolean inBackground) throws IOException
+  {
     load(zipFile, inBackground);
   }
 
-  public OpenOfficeSpellDictionary(InputStream zipStream, File personalDict) throws IOException {
+  public OpenOfficeSpellDictionary(InputStream zipStream, File personalDict) throws IOException
+  {
     this(zipStream, personalDict, true);
   }
 
   // NOTE : If inBackground is true when the dict is loaded the zipStream is closed.
-  public OpenOfficeSpellDictionary(final InputStream zipStream, final File personalDict, boolean inBackground) throws IOException {
+  public OpenOfficeSpellDictionary(final InputStream zipStream, final File personalDict, boolean inBackground) throws IOException
+  {
     load(zipStream, personalDict, inBackground);
   }
 
-  public OpenOfficeSpellDictionary(File file) throws IOException {
+  public OpenOfficeSpellDictionary(File file) throws IOException
+  {
     this(file, true);
   }
 
-  public OpenOfficeSpellDictionary(File file, boolean inBackground) throws IOException {
+  public OpenOfficeSpellDictionary(File file, boolean inBackground) throws IOException
+  {
     load(file, inBackground);
   }
 
-  public OpenOfficeSpellDictionary(File dictFile, File affFile) throws IOException {
+  public OpenOfficeSpellDictionary(File dictFile, File affFile) throws IOException
+  {
     this(dictFile, affFile, true);
   }
 
-  public OpenOfficeSpellDictionary(File dictFile, File affFile, boolean inBackground) throws IOException {
+  public OpenOfficeSpellDictionary(File dictFile, File affFile, boolean inBackground) throws IOException
+  {
     load(dictFile, affFile, inBackground);
   }
 
-  private void initFromFiles(final File dictFile, final File affFile, boolean inBackground) throws IOException {
+  private void initFromFiles(final File dictFile, final File affFile, boolean inBackground) throws IOException
+  {
 
-    if (inBackground) {
+    if (inBackground)
+    {
       final ExecutorService executor = Executors.newSingleThreadExecutor();
 
       loader = executor.submit(
-              new Callable<Object>() {
+          new Callable<Object>()
+          {
 
-                public Object call() throws Exception {
-                  initFromFiles(dictFile, affFile);
-                  executor.shutdown(); // we no need more the executor
-                  return null;
-                }
-              });
-    } else {
+            @Override
+            public Object call() throws Exception
+            {
+              try
+              {
+                initFromFiles(dictFile, affFile);
+                //executor.shutdown(); // we no need more the executor
+                return null;
+              }
+              catch (Exception ex)
+              {
+                ex.printStackTrace();
+                return null;
+              }
+            }
+          });
+    }
+    else
+    {
       initFromFiles(dictFile, affFile);
 
     }
   }
 
-  private synchronized void beginLoad() {
-    listeners.beginProgress(new ProgressEvent(this, "Cargando diccionario", 0, 2));
+  private synchronized void beginLoad()
+  {
+    listeners.beginProgress(new ProgressEvent(this, "Load dictionary", 0, 2));
   }
 
-  private synchronized void endLoad(IOException ex) throws IOException {
+  private synchronized void endLoad(IOException ex) throws IOException
+  {
     listeners.endProgress(new ProgressEvent(this, ex));
     throw ex;
   }
 
-  private synchronized void endLoad(MySpell dict) {
+  private synchronized void endLoad(MySpell dict)
+  {
     mySpell = dict;
-    listeners.endProgress(new ProgressEvent(this, "Carga realizada con éxito", 2, 2));
+    listeners.endProgress(new ProgressEvent(this, "Dictionary loaded", 2, 2));
   }
 
-  private void initFromFiles(File dictFile, File affFile) throws IOException {
-    try {
+  private void initFromFiles(File dictFile, File affFile) throws IOException
+  {
+    try
+    {
       beginLoad();
 
       personalDict = getPersonalWordsFile(getLocale());
@@ -141,13 +160,17 @@ public class OpenOfficeSpellDictionary implements SpellDictionary {
       readPersonalWords(personalDict, dict);
 
       endLoad(dict);
-    } catch (IOException ex) {
+    }
+    catch (IOException ex)
+    {
       endLoad(ex);
     }
   }
 
-  private void initFromZipFile(ZipFile zipFile) throws IOException {
-    try {
+  private void initFromZipFile(ZipFile zipFile) throws IOException
+  {
+    try
+    {
       beginLoad();
 
       personalDict = getPersonalWordsFile(getLocale());
@@ -156,13 +179,17 @@ public class OpenOfficeSpellDictionary implements SpellDictionary {
       readPersonalWords(personalDict, dict);
 
       endLoad(dict);
-    } catch (IOException ex) {
+    }
+    catch (IOException ex)
+    {
       endLoad(ex);
     }
   }
 
-  private void initFromStream(InputStream zipStream, File personalDict) throws IOException {
-    try {
+  private void initFromStream(InputStream zipStream, File personalDict) throws IOException
+  {
+    try
+    {
       beginLoad();
 
       this.personalDict = personalDict;
@@ -171,13 +198,17 @@ public class OpenOfficeSpellDictionary implements SpellDictionary {
       readPersonalWords(personalDict, dict);
 
       endLoad(dict);
-    } catch (IOException ex) {
+    }
+    catch (IOException ex)
+    {
       endLoad(ex);
     }
   }
 
-  private void initFromStreams(InputStream dicIS, InputStream affIS, File personalDict) throws IOException {
-    try {
+  private void initFromStreams(InputStream dicIS, InputStream affIS, File personalDict) throws IOException
+  {
+    try
+    {
       beginLoad();
 
       this.personalDict = personalDict;
@@ -186,95 +217,153 @@ public class OpenOfficeSpellDictionary implements SpellDictionary {
       readPersonalWords(personalDict, dict);
 
       endLoad(dict);
-    } catch (IOException ex) {
+    }
+    catch (IOException ex)
+    {
       endLoad(ex);
     }
 
   }
 
-  public void addWord(String word) throws SpellDictionaryException {
+  @Override
+  public void addWord(String word) throws SpellDictionaryException
+  {
     waitToLoad();
 
     PrintWriter pw = null;
 
     word = word.trim();
 
-    try {
+    try
+    {
       pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(personalDict, true), mySpell.get_dic_encoding()));
 
       mySpell.addCustomWord(word);
 
       pw.println(word);
-    } catch (Exception ex) {
+    }
+    catch (Exception ex)
+    {
       throw new SpellDictionaryException(ex);
-    } finally {
-      try {
+    }
+    finally
+    {
+      try
+      {
         Utils.close(pw);
-      } catch (IOException e) {
+      }
+      catch (IOException e)
+      {
         throw new SpellDictionaryException(e);
       }
     }
+
+    dictionaryListeners.getMulticaster().wordAdded(word);
   }
 
-  public boolean isCorrect(String word) {
+  @Override
+  public boolean isCorrect(String word)
+  {
     waitToLoad();
 
     return mySpell.spell(word);
   }
 
-  public List<String> getSuggestions(String word) {
+  @Override
+  public List<String> getSuggestions(String word)
+  {
     waitToLoad();
 
     return mySpell.suggest(word);
   }
 
-  public List<String> getSuggestions(String word, int nMax) {
+  @Override
+  public List<String> getSuggestions(String word, int nMax)
+  {
     waitToLoad();
 
     return mySpell.suggest(word, nMax);
   }
 
-  public synchronized boolean isLoad() {
+  @Override
+  public synchronized boolean isLoad()
+  {
     return null != mySpell;
   }
 
-  private void waitToLoad() {
+  /**
+   * Fügt einen DictionaryListener hinzu
+   *
+   * @param pListener Listener, der hinzugefügt werden soll
+   */
+  @Override
+  public void addDictionaryListener(ISpellDictionaryListener pListener)
+  {
+    dictionaryListeners.addListener(pListener);
+  }
 
-    try {
-      if (null != loader && !loader.isDone()) {
+  /**
+   * Entfernt einen DictionaryListener
+   *
+   * @param pListener Listener, der entfernt werden soll
+   */
+  @Override
+  public void removeDictionaryListener(ISpellDictionaryListener pListener)
+  {
+    dictionaryListeners.removeListener(pListener);
+  }
+
+  private void waitToLoad()
+  {
+
+    try
+    {
+      if (null != loader && !loader.isDone())
+      {
         loader.get(); // If were and excpetion this method rethrow it
         loader = null;
       }
 
-      if (!isLoad()) {
+      if (!isLoad())
+      {
         throw new IllegalStateException();
       }
 
-    } catch (Exception e) {
+    }
+    catch (Exception e)
+    {
       throw new IllegalStateException(e);
     }
   }
 
-  private static File getPersonalWordsFile(Locale locale) {
+  private static File getPersonalWordsFile(Locale locale)
+  {
 
-    if (null != locale) {
+    if (null != locale)
+    {
       return new File(FileUtils.getJMySpellDir(), String.format("%s_%s.per", locale.getLanguage(), locale.getCountry()));
-    } else {
-      return getPersonalWordsFile() ;
-  
+    }
+    else
+    {
+      return getPersonalWordsFile();
+
     }
   }
 
-  private static File getPersonalWordsFile() {
+  private static File getPersonalWordsFile()
+  {
     return new File(FileUtils.getJMySpellDir(), "dictionary.per");
   }
 
-  private void readPersonalWords(File personalFile, MySpell mySpell) throws IOException {
+  private void readPersonalWords(File personalFile, MySpell mySpell) throws IOException
+  {
     BufferedReader rd = null;
     FileInputStream fr = null;
 
-    try {
-      if (null != personalFile && personalFile.exists() && !personalFile.isDirectory()) {
+    try
+    {
+      if (null != personalFile && personalFile.exists() && !personalFile.isDirectory())
+      {
         fr = new FileInputStream(personalFile);
 
         rd = new BufferedReader(new InputStreamReader(fr, mySpell.get_dic_encoding()));
@@ -286,7 +375,8 @@ public class OpenOfficeSpellDictionary implements SpellDictionary {
 
         String line = rd.readLine();
 
-        while (line != null) {
+        while (line != null)
+        {
           current = size - fr.available();
           listeners.nextStep(new ProgressEvent(this, "Cargando diccionario personal", current, size));
 
@@ -294,117 +384,159 @@ public class OpenOfficeSpellDictionary implements SpellDictionary {
           line = rd.readLine();
         }
       }
-    } finally {
+    }
+    finally
+    {
       Utils.close(rd);
     }
   }
 
-  public void load(InputStream affIS, InputStream dicIS, boolean inBackground) throws IOException {
-    load(affIS, dicIS, getPersonalWordsFile(getLocale()), true);
+  public void load(InputStream affIS, InputStream dicIS, boolean inBackground) throws IOException
+  {
+    load(affIS, dicIS, getPersonalWordsFile(getLocale()), inBackground);
   }
 
-  public void load(final InputStream affIS, final InputStream dicIS, final File personalDict, boolean inBackground) throws IOException {
-    if (inBackground) {
+  public void load(final InputStream affIS, final InputStream dicIS, final File personalDict, boolean inBackground) throws IOException
+  {
+    if (inBackground)
+    {
       final ExecutorService executor = Executors.newSingleThreadExecutor();
 
       loader = executor.submit(
-              new Callable<Object>() {
+          new Callable<Object>()
+          {
 
-                public Object call() throws Exception {
-                  initFromStreams(affIS, dicIS, personalDict);
-                  dicIS.close();
-                  affIS.close();
-                  executor.shutdown(); // we no need more the executor
-                  return null;
-                }
-              });
-    } else {
+            @Override
+            public Object call() throws Exception
+            {
+              initFromStreams(affIS, dicIS, personalDict);
+              dicIS.close();
+              affIS.close();
+              executor.shutdown(); // we no need more the executor
+              return null;
+            }
+          });
+    }
+    else
+    {
       initFromStreams(affIS, dicIS, personalDict);
 
     }
   }
 
-  public void load(final ZipFile zipFile, boolean inBackground) throws IOException {
-    if (inBackground) {
+  public void load(final ZipFile zipFile, boolean inBackground) throws IOException
+  {
+    if (inBackground)
+    {
       final ExecutorService executor = Executors.newSingleThreadExecutor();
 
       loader = executor.submit(
-              new Callable<Object>() {
+          new Callable<Object>()
+          {
 
-                public Object call() throws Exception {
-                  initFromZipFile(zipFile);
-                  executor.shutdown(); // we no need more the executor
-                  return null;
-                }
-              });
-    } else {
+            @Override
+            public Object call() throws Exception
+            {
+              initFromZipFile(zipFile);
+              executor.shutdown(); // we no need more the executor
+              return null;
+            }
+          });
+    }
+    else
+    {
       initFromZipFile(zipFile);
 
     }
   }
 
-  public void load(final InputStream zipStream, final File personalDict, boolean inBackground) throws IOException {
-    if (inBackground) {
+  public void load(final InputStream zipStream, final File personalDict, boolean inBackground) throws IOException
+  {
+    if (inBackground)
+    {
       final ExecutorService executor = Executors.newSingleThreadExecutor();
 
       loader = executor.submit(
-              new Callable<Object>() {
+          new Callable<Object>()
+          {
 
-                public Object call() throws Exception {
-                  initFromStream(zipStream, personalDict);
-                  zipStream.close();
-                  executor.shutdown(); // we no need more the executor
-                  return null;
-                }
-              });
-    } else {
+            @Override
+            public Object call() throws Exception
+            {
+              initFromStream(zipStream, personalDict);
+              zipStream.close();
+              executor.shutdown(); // we no need more the executor
+              return null;
+            }
+          });
+    }
+    else
+    {
       initFromStream(zipStream, personalDict);
 
     }
   }
 
-  public void load(File dictFile, File affFile, boolean inBackground) throws IOException {
+  public void load(File dictFile, File affFile, boolean inBackground) throws IOException
+  {
     initFromFiles(dictFile, affFile, inBackground);
   }
 
-  public void load(File file, boolean inBackground) throws IOException {
-    if (file.getName().endsWith(".zip")) {
+  public void load(File file, boolean inBackground) throws IOException
+  {
+    if (file.getName().endsWith(".zip"))
+    {
       load(new ZipFile(file), inBackground);
 
-    } else {
+    }
+    else
+    {
       load(new File(FileUtils.extractRootFile(file) + ".dic"), new File(FileUtils.extractRootFile(file) + ".aff"), inBackground);
     }
   }
 
-  public void setDictionarySource(URL url) {
+  public void setDictionarySource(URL url)
+  {
     sourceURL = url;
   }
 
-  public void load() throws IOException {
-    if (null == sourceURL) {
+  @Override
+  public void load() throws IOException
+  {
+    if (null == sourceURL)
+    {
       throw new IllegalStateException("No dictionary source set");
     }
 
     load(sourceURL.openStream(), getPersonalWordsFile(getLocale()), true);
   }
 
-  public void addProgressListener(ProgressListener listener) {
-    if (null != loader) {
+  @Override
+  public void addProgressListener(ProgressListener listener)
+  {
+    if (null != loader)
+    {
       throw new IllegalStateException("This dictionary load was started");
     }
 
     listeners.addListener(listener);
   }
 
-  public void removeProgressListener(ProgressListener listener) {
+  @Override
+  public void removeProgressListener(ProgressListener listener)
+  {
     listeners.removeListener(listener);
   }
 
-  public void setLocale(Locale locale) {
+  public void setLocale(Locale locale)
+  {
     this.locale = locale;
   }
 
-  public Locale getLocale() {
+  @Override
+  public Locale getLocale()
+  {
     return locale;
   }
 }
+
