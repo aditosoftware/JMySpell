@@ -62,7 +62,8 @@ public class DefaultWordTokenizer extends AbstractWordTokenizer
   }
   /**
    * Properly trim a string of all whitespace, including linebreaks and
-   * unicode whitespace
+   * unicode whitespace. Additionally trims the string of all other invisible
+   * characters.
    *
    * @param sequence
    *            char sequence
@@ -73,7 +74,7 @@ public class DefaultWordTokenizer extends AbstractWordTokenizer
     if (sequence == null)
       return null;
     else
-      return CharMatcher.WHITESPACE.trimFrom(sequence);
+      return CharMatcher.WHITESPACE.or(CharMatcher.INVISIBLE).trimFrom(sequence);
   }
   
   /*
